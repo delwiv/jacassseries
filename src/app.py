@@ -12,6 +12,7 @@ from src.audio.output import AudioOutput
 from src.audio.vad import EnergyVAD
 from src.config import Config
 from src.input.injector import TextInjector
+from src.ipc.server import IPCServer
 from src.llm.client import LLMClient
 from src.pipeline.orchestrator import Mode, Orchestrator, State
 from src.pipeline.streamer import TTSStreamer
@@ -50,7 +51,7 @@ def _run_in_thread(target, on_done=None, on_error=None, label=""):
 
 
 class JacasseriesApp(QApplication):
-    def __init__(self, argv: list[str]) -> None:
+    def __init__(self, argv: list[str], startup_cmd: dict | None = None) -> None:
         super().__init__(argv)
         self.setApplicationName("jacasseries")
         self.setOrganizationName("jacasseries")
@@ -63,6 +64,11 @@ class JacasseriesApp(QApplication):
         self.injector = TextInjector()
         self.vad = EnergyVAD(timeout=self.config.silence_timeout)
         self.audio = AudioCapture()
+        self._ipc = IPCServer()
+        self._ipc.on_command = lambda cmd: _main.invoke.emit(lambda: self._handle_command(cmd))
+        self.aboutToQuit.connect(self._ipc.stop)
+        self._startup_cmd = startup_cmd
+        self._ready = False
         self.transcriber = Transcriber(
             model_size=self.config.stt_model_size,
             language=self.config.stt_language,
@@ -112,22 +118,37 @@ class JacasseriesApp(QApplication):
             self._reload_config()
 
     def _reload_config(self) -> None:
+        old_stt_size = self.transcriber.model_size
+        old_stt_lang = self.transcriber.language
+        old_voice = self.synthesizer.voice
+
         self.llm.base_url = self.config.api_url
         self.llm.api_key = self.config.api_key
         self.llm.model = self.config.llm_model
         self.transcriber.model_size = self.config.stt_model_size
         self.transcriber.language = self.config.stt_language
-        self.synthesizer = Synthesizer(
-            voice=self.config.tts_voice or "fr_FR-siwis-medium"
-        )
-        self.streamer = TTSStreamer(self.synthesizer, self.audio_out)
-        self.streamer.on_done = lambda: _main.invoke.emit(self._on_tts_done)
-        self.streamer.on_error = lambda e: _main.invoke.emit(self.orchestrator.interrupt)
-        self.streamer.start()
+
         if self.config.microphone:
             self.audio.device = int(self.config.microphone)
         self.shortcut.register(self.config.keyboard_shortcut)
-        _run_in_thread(lambda: self._preload_models(), label="preload")
+
+        stt_changed = (
+            self.transcriber.model_size != old_stt_size
+            or self.transcriber.language != old_stt_lang
+        )
+        if stt_changed:
+            _run_in_thread(lambda: self.transcriber.reload(), label="stt-reload")
+
+        new_voice = self.config.tts_voice or "fr_FR-siwis-medium"
+        if new_voice != old_voice:
+            self.streamer.stop()
+            self.synthesizer = Synthesizer(voice=new_voice)
+            self.streamer = TTSStreamer(self.synthesizer, self.audio_out)
+            self.streamer.on_done = lambda: _main.invoke.emit(self._on_tts_done)
+            self.streamer.on_error = lambda e: _main.invoke.emit(self.orchestrator.interrupt)
+            self.streamer.start()
+            _run_in_thread(lambda: self.synthesizer.load_voice(), label="tts-reload")
+
         print("[config] reloaded")
 
     def _reset_discussion(self) -> None:
@@ -171,6 +192,17 @@ class JacasseriesApp(QApplication):
         if self.orchestrator.state == State.RECORDING:
             print("[vad] silence timeout, auto-stop")
             self._stop_and_transcribe()
+
+    def _handle_command(self, cmd: dict) -> None:
+        print(f"[ipc] handling command: {cmd}")
+        if cmd.get("reset"):
+            self._reset_discussion()
+        mode_str = cmd.get("mode")
+        if mode_str:
+            mode = Mode[mode_str.upper()]
+            self._on_mode_change(mode)
+        if cmd.get("record"):
+            self._on_fab_click()
 
     def _on_fab_click(self) -> None:
         current = self.orchestrator.state
@@ -247,10 +279,15 @@ class JacasseriesApp(QApplication):
         self.tray.show()
         self.streamer.start()
         self.shortcut.register(self.config.keyboard_shortcut)
+        self._ipc.start()
         _run_in_thread(lambda: self._preload_models(), label="preload")
 
     def _preload_models(self) -> None:
         print("[preload] loading models...")
         self.transcriber.load_model()
         self.synthesizer.load_voice()
+        self._ready = True
         print("[preload] ready")
+        if self._startup_cmd:
+            _main.invoke.emit(lambda: self._handle_command(self._startup_cmd))
+            self._startup_cmd = None

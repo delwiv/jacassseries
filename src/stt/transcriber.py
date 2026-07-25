@@ -68,6 +68,10 @@ class Transcriber:
         )
         print("[stt] model loaded")
 
+    def reload(self) -> None:
+        self._model = None
+        self.load_model()
+
     def transcribe(self, audio: np.ndarray) -> str:
         self.load_model()
         segments, info = self._model.transcribe(

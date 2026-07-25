@@ -1,8 +1,19 @@
+from __future__ import annotations
+
+import argparse
 import os
 import signal
 import sys
 
 from PySide6.QtCore import QTimer
+
+FLAG_MAP = {
+    "dictate": {"mode": "dictation", "record": True},
+    "dicter": {"mode": "dictation", "record": True},
+    "discuss": {"mode": "conversation", "record": True},
+    "jacasser": {"mode": "conversation", "record": True},
+    "reset": {"reset": True},
+}
 
 
 def _setup_cuda() -> None:
@@ -20,12 +31,32 @@ def _setup_cuda() -> None:
             print(f"[cuda] warning: could not load {fname}: {e}")
 
 
+def _parse_args() -> dict | None:
+    parser = argparse.ArgumentParser(description="jacasseries — voice interface for LLM")
+    for flag, action in FLAG_MAP.items():
+        parser.add_argument(f"--{flag}", action="store_true", help=action.get("cmd", str(action)))
+    args = parser.parse_args()
+    cmd = {}
+    for flag, action in FLAG_MAP.items():
+        if getattr(args, flag.replace("-", "_"), False):
+            cmd.update(action)
+    return cmd if cmd else None
+
+
 def main() -> None:
+    cmd = _parse_args()
+
+    if cmd:
+        from src.ipc.client import send_command
+        if send_command(cmd):
+            print(f"[ipc] sent command: {cmd}")
+            return
+
     _setup_cuda()
 
     from src.app import JacasseriesApp
 
-    app = JacasseriesApp(sys.argv)
+    app = JacasseriesApp(sys.argv, startup_cmd=cmd)
 
     signal.signal(signal.SIGINT, lambda *_: QTimer.singleShot(0, app.quit))
 

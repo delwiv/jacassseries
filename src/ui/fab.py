@@ -43,11 +43,15 @@ class FAB(QWidget):
     quit_requested = Signal()
     mode_change_requested = Signal(object)
 
+    _DRAG_THRESHOLD = 5
+
     def __init__(self) -> None:
         super().__init__()
         self._state = State.IDLE
         self._mode = Mode.CONVERSATION
         self._drag_pos: QPoint | None = None
+        self._press_pos: QPoint | None = None
+        self._dragged = False
         self._long_press_fired = False
         self._long_press_timer = QTimer(self)
         self._long_press_timer.setSingleShot(True)
@@ -117,7 +121,7 @@ class FAB(QWidget):
 
     def _on_button_released(self) -> None:
         self._long_press_timer.stop()
-        if not self._long_press_fired:
+        if not self._long_press_fired and not self._dragged:
             self.clicked.emit()
 
     def _on_long_press(self) -> None:
@@ -148,12 +152,20 @@ class FAB(QWidget):
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            self._press_pos = event.globalPosition().toPoint()
+            self._dragged = False
             event.accept()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if event.buttons() == Qt.MouseButton.LeftButton and self._drag_pos is not None:
+            if self._press_pos:
+                delta = event.globalPosition().toPoint() - self._press_pos
+                if delta.manhattanLength() > self._DRAG_THRESHOLD:
+                    self._dragged = True
             self.move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self._drag_pos = None
+        self._press_pos = None
+        self._dragged = False
