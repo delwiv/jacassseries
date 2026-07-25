@@ -54,19 +54,19 @@ States: `idle → recording → transcribing → (text injected) → idle`
 - Python ≥ 3.11
 - Linux (macOS/Windows support planned)
 - CUDA-capable GPU recommended but optional (AMD/Intel via Vulkan planned)
-- `wtype` — required for dictation mode on **Wayland**
+- `wtype` — required for dictation mode (any Wayland compositor)
 - `~/.local/bin` in `PATH` — for the `jacasseries` command (after `pip install --user`)
 
 ### X11 vs Wayland
 
 | Feature | X11 | Wayland |
 |---------|:---:|:-------:|
-| Keyboard shortcut (`pynput`) | Yes | No (use desktop WM binding) |
+| Keyboard shortcut (`pynput`) | Yes | No (use compositor binding) |
 | Dictation text injection (`pynput`) | Yes | No |
 | Dictation text injection (`wtype`) | No | Yes |
 
-Under Wayland, jacasseries relies on your window manager for global shortcuts
-via IPC (e.g. `bindsym $mod+d exec jacasseries --dicter`) and on `wtype` for
+Under Wayland, jacasseries relies on your compositor for global shortcuts
+via IPC flags (e.g. `--dicter`, `--jacasser`, `--reset`) and on `wtype` for
 text injection in dictation mode.
 
 ## Installation
@@ -143,13 +143,17 @@ Toggle via right-click menu → "Mode dictée". The FAB icon changes to ⌨.
 - Text is also copied to clipboard for manual paste (Ctrl+V)
 - Use for: dictating prompts, filling forms, writing without the keyboard
 
-### Sway configuration
+### Wayland compositor configuration
 
-```config
-bindsym $mod+d exec jacasseries --dicter
-bindsym $mod+r exec jacasseries --jacasser
-bindsym $mod+Shift+r exec jacasseries --reset
-```
+The IPC flags work under any Wayland compositor. Here are common syntaxes:
+
+| Compositor | Configuration |
+|------------|--------------|
+| Sway (wlroots) | `bindsym $mod+d exec jacasseries --dicter` |
+| Hyprland | `bind = $mod, D, exec, jacasseries --dicter` |
+| River (wlroots) | `riverctl map normal Super+Z spawn "jacasseries --dicter"` |
+| KDE | System Settings → Raccourcis → ajouter commande `jacasseries --dicter` |
+| GNOME | Extensions + Settings → Raccourcis → commande `jacasseries --dicter` |
 
 ## Project Structure
 
