@@ -1,27 +1,27 @@
-# jacasseries — Voice Interface für LLM
+# jacasseries — Voice Interface for LLM
 
-**jacasseries** — du cri de la pie (jacasser), qui veut aussi dire bavarder.
-Projet : interface vocale pour discuter avec un LLM, comme on bavarderait avec quelqu'un.
+**jacasseries** — from the cry of the magpie (jacasser), which also means to chatter.
+Project: a voice interface to chat with an LLM, like you'd chat with someone.
 
 ## Philosophy
 
-- **Prose coding**, pas vibe coding. Chaque ligne est réfléchie.
-- **NE PAS combler les zones d'ombre.** Si une instruction est ambiguë, demander clarification. Ne pas inventer des décisions.
-- Architecture d'abord, code ensuite.
-- Itérations courtes, fondations solides.
+- **Prose coding**, not vibe coding. Every line is thought through.
+- **DO NOT fill in the blanks.** If an instruction is ambiguous, ask for clarification. Do not invent decisions.
+- Architecture first, code afterwards.
+- Short iterations, solid foundations.
 
 ## License
 
-MIT — faites ce que vous voulez, citez l'auteur original.
+MIT — do what you want, credit the original author.
 
-## Architecture générale
+## General Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                      jacasseries                          │
 ├──────────────────────────────────────────────────────────┤
 │                                                           │
-│  [OS Signal / Keyboard Shortcut]                          │
+│  [OS Signal / Keyboard Shortcut / IPC]                    │
 │         │                                                 │
 │         ▼                                                 │
 │  [Audio Capture] ──buffers 200ms──► [faster-whisper]      │
@@ -30,7 +30,7 @@ MIT — faites ce que vous voulez, citez l'auteur original.
 │         │          ◄── partial transcriptions ──          │
 │         ▼                                                 │
 │  [Voice Activity Detection]                               │
-│  (Silero VAD)                                             │
+│  (EnergyVAD)                                              │
 │         │                                                 │
 │         ▼                                                 │
 │  [LLM API] (llama.cpp server, OpenAI-compatible, distant) │
@@ -39,82 +39,86 @@ MIT — faites ce que vous voulez, citez l'auteur original.
 │  [Piper TTS] ──► [Audio Output]                           │
 │  (local, CUDA)     (sounddevice)                          │
 │                                                           │
-│  [Floating Widget] — état visible en temps réel           │
-│  [System Tray] — minimisation                             │
+│  [Floating Widget] — real-time state indicator            │
+│  [System Tray] — minimise to tray                         │
 │  [Configuration] — URL, Key, Model, Voice                 │
 │                                                           │
 └──────────────────────────────────────────────────────────┘
 ```
 
-## Pipeline (data flow détaillé)
+## Pipeline (data flow)
 
-1. **idle** — micro inactif, FAB visible, icône micro gris
-2. **recording** — utilisateur appuie (clic/raccourci), buffers audio envoyés à faster-whisper en continu. Transcription partielle affichée/traitée. FAB → rouge, icône micro actif
-3. **transcribing** — fin d'enregistrement, transcription finale produite
-4. **llm** — transcription envoyée au LLM via API streaming. FAB → bleu/thinking
-5. **tts** — réponse LLM envoyée par morceaux à Piper TTS, audio joué. FAB → vert, icône haut-parleur
-6. **interruption** (v2+) — si mot-clé ("stop", "arrête") détecté pendant TTS, on coupe l'audio et revient à idle. Si utilisateur rappuie, on coupe le TTS et on recommence un cycle.
-7. **retour à idle** — prêt pour la prochaine discussion
+1. **idle** — mic off, FAB visible, grey mic icon
+2. **recording** — user presses (click/shortcut), audio buffers sent to faster-whisper continuously. Partial transcriptions displayed. FAB → red, active mic icon
+3. **transcribing** — recording ends, final transcription produced
+4. **llm** — transcription sent to LLM via streaming API. FAB → blue/thinking
+5. **tts** — LLM response streamed to Piper TTS chunk by chunk, audio played. FAB → green, speaker icon
+6. **dictation** — transcription injected directly into focused field (skip LLM + TTS)
+7. **back to idle** — ready for next interaction
 
-## États du widget FAB
+## FAB Widget States
 
-| État | Couleur | Icône | Comportement |
-|------|---------|-------|--------------|
-| idle | Gris | 🎤 | Clique = start recording |
-| recording | Rouge | 🎤 (animé) | Clique = stop recording |
+| State | Color | Icon | Behaviour |
+|-------|-------|------|-----------|
+| idle | Grey | 🎤 | Click = start recording |
+| recording | Red | 🎤 (animated) | Click = stop recording |
 | transcribing | Orange | ✏️ | Transient |
-| llm | Bleu | 🤖 | Streaming LLM |
-| tts | Vert | 🔊 | Audio joué. Clique = interrupt TTS |
+| llm | Blue | 🤖 | Streaming LLM |
+| tts | Green | 🔊 | Audio playing. Click = interrupt TTS |
 
-À terme : animation du spectre audio autour du bouton pendant l'enregistrement.
+Future: audio spectrum animation around the button during recording.
 
 ## Tech Stack
 
-| Couche | Technologie | Raison |
-|--------|------------|--------|
-| Language | Python 3.11+ | Écosystème riche, bindings partout |
+| Layer | Technology | Reason |
+|-------|-----------|--------|
+| Language | Python 3.11+ | Rich ecosystem, bindings everywhere |
 | UI | PySide6 | LGPL, frameless, system tray, cross-platform, mature |
-| Audio I/O | sounddevice | Latence faible, streaming, multi-platform |
-| STT | faster-whisper | Python natif, CUDA, 4x plus rapide que Whisper |
-| VAD | Silero VAD | Intégré à faster-whisper, léger, fiable |
-| TTS | Piper TTS | Local, rapide, multilingue, voix françaises |
-| LLM Client | httpx + SSE | Streaming, compatible OpenAI API |
-| Keyword Spotting | openWakeWord (v2+) | Léger, CPU only, dédié |
-| Config | TOML + JSON | Simple, lisible |
+| Audio I/O | sounddevice | Low latency, streaming, multi-platform |
+| STT | faster-whisper | Native Python, CUDA, 4x faster than Whisper |
+| VAD | EnergyVAD (custom) | RMS-based, zero dependencies, integrated |
+| TTS | Piper TTS | Local, fast, multilingual, French voices |
+| LLM Client | httpx + SSE | Streaming, OpenAI-compatible API |
+| Text Injection | wtype | Wayland-native keyboard simulation |
+| IPC | Unix socket | CLI flags → daemon communication |
+| Keyword Spotting | openWakeWord (future) | Lightweight, CPU only, dedicated |
+| Config | TOML | Simple, readable |
 
-## Audio Capture : streaming vers STT
+## Audio Capture: streaming to STT
 
-- Buffer glissant de 200ms, envoyé à faster-whisper en continu.
-- Whisper produit des transcriptions partielles qui s'affinent.
-- Pas besoin d'attendre la fin de la phrase — le LLM peut recevoir des bouts et commencer à répondre (ou on attend la phrase complète, à déterminer).
-- On commence par attendre la fin de l'enregistrement pour envoyer au LLM. Puis on itèrera vers du streaming plus poussé (début de réponse LLM avant la fin de la question).
+- 200ms sliding buffer, sent to faster-whisper continuously.
+- Whisper produces partial transcriptions that are refined.
+- Currently: wait for recording end before sending to LLM.
+- Future: streaming partial transcriptions to LLM for early response.
 
-## TTS et interruption
+## Dictation Mode
 
-- v1 (push-to-talk) :
-  - TTS joue la réponse. Utilisateur rappuie → TTS stoppé, nouvel enregistrement.
-- v2 (keyword interrupt) :
-  - openWakeWord tourne en fond pendant TTS. Détection de "stop/arrête" → TTS coupé.
-- v3 (VAD naturel) :
-  - VAD détecte parole pendant TTS → transcription du segment → interruption intelligente.
+- Speak → silence auto-stop (EnergyVAD, configurable timeout) → transcribe
+- Text copied to clipboard AND injected into focused field via `wtype`
+- FAB icon switches to ⌨
 
-Le but final est de simuler une vraie conversation : on peut interrompre, rebondir, le LLM reçoit le contexte de la conversation précédente.
+## IPC & CLI Flags
+
+- Unix socket at `~/.local/state/jacasseries/jacasseries.sock`
+- Hot start: app already running → command sent via socket → exit
+- Cold start: app launches, buffers command, executes after model preload
+- Flags: `--dicter`, `--jacasser`, `--reset`
 
 ## Configuration
 
-Fenêtre dédiée avec :
+Config window with:
 
-- **API URL** : URL du serveur llama.cpp (ou tout serveur OpenAI-compatible)
-- **API Key** : clé (optionnelle, selon config serveur)
-- **Modèle LLM** : sélecteur basé sur `GET /v1/models`
-- **Langue STT** : français, anglais, auto
-- **Voix TTS** : sélection selon modèles Piper disponibles
-- **Raccourci clavier** : configurable
-- **Microphone** : sélection du périphérique d'entrée
+- **API URL** : llama.cpp server URL (or any OpenAI-compatible server)
+- **API Key** : optional, depending on server config
+- **LLM Model** : selector based on `GET /v1/models`
+- **STT Language** : French, English, auto
+- **TTS Voice** : selection from available Piper voices
+- **Keyboard shortcut** : deprecated under Wayland (use compositor bindings + IPC)
+- **Microphone** : input device selection
 
-Stockage : `~/.config/jacasseries/config.toml`
+Storage: `~/.config/jacasseries/config.toml`
 
-## Structure du projet
+## Project Structure
 
 ```
 jacasseries/
@@ -122,28 +126,35 @@ jacasseries/
 ├── LICENSE
 ├── pyproject.toml
 ├── README.md
+├── README.fr.md
 ├── src/
-│   ├── main.py                  # Point d'entrée
-│   ├── app.py                   # Application PySide6
-│   ├── config.py                # Gestion config TOML
+│   ├── main.py                  Entry point + CLI args
+│   ├── app.py                   PySide6 application
+│   ├── config.py                TOML config management
 │   ├── audio/
-│   │   ├── capture.py           # sounddevice → buffers
-│   │   ├── output.py            # sounddevice playback
-│   │   └── vad.py               # Silero VAD wrapper
+│   │   ├── capture.py           sounddevice → buffers
+│   │   ├── output.py            sounddevice playback
+│   │   └── vad.py               EnergyVAD (silence detection)
 │   ├── stt/
-│   │   └── transcriber.py       # faster-whisper wrapper
+│   │   └── transcriber.py       faster-whisper wrapper
 │   ├── llm/
-│   │   └── client.py            # Client API OpenAI-compatible
+│   │   └── client.py            OpenAI-compatible API client
 │   ├── tts/
-│   │   └── synthesizer.py       # Piper TTS wrapper
+│   │   └── synthesizer.py       Piper TTS wrapper
+│   ├── input/
+│   │   └── injector.py          wtype text injection
+│   ├── ipc/
+│   │   ├── server.py            Unix socket server
+│   │   └── client.py            Unix socket client
 │   ├── pipeline/
-│   │   └── orchestrator.py      # États, transitions, flux
+│   │   ├── orchestrator.py      State machine + mode
+│   │   └── streamer.py          TTS streaming engine
 │   ├── ui/
-│   │   ├── fab.py               # Floating widget FAB
-│   │   ├── tray.py              # System tray
-│   │   └── config_window.py     # Fenêtre de configuration
+│   │   ├── fab.py               Floating action button
+│   │   ├── tray.py              System tray
+│   │   └── config_window.py     Configuration dialog
 │   └── keyword/
-│       └── spotter.py           # openWakeWord (v2+)
+│       └── spotter.py           Global shortcut (X11 pynput)
 ├── tests/
 │   └── ...
 └── resources/
@@ -153,56 +164,60 @@ jacasseries/
 
 ## Roadmap (phases)
 
-### Phase 1 — squelette
-- [ ] Structure du projet, pyproject.toml, dépendances
-- [ ] Config TOML (lecture/écriture)
-- [ ] Audio capture (sounddevice, buffers)
-- [ ] FAB widget (PySide6, frameless, toujours au-dessus)
-- [ ] Pipeline orchestrator (états idle/recording/llm/tts)
+### Phase 1 — skeleton
+- [x] Project structure, pyproject.toml, dependencies
+- [x] TOML config (read/write)
+- [x] Audio capture (sounddevice, buffers)
+- [x] FAB widget (PySide6, frameless, always-on-top)
+- [x] Pipeline orchestrator (idle/recording/llm/tts states)
 
 ### Phase 2 — STT + LLM
-- [ ] faster-whisper intégration (CUDA, streaming buffers)
-- [ ] Client LLM (API OpenAI-compatible, SSE)
-- [ ] Boucle complète : recording → transcription → LLM → affichage texte
+- [x] faster-whisper integration (CUDA, streaming buffers)
+- [x] LLM client (OpenAI-compatible API, SSE)
+- [x] Full loop: recording → transcription → LLM → text display
 
 ### Phase 3 — TTS + playback
-- [ ] Piper TTS intégration
-- [ ] Audio output
-- [ ] Boucle complète avec son : recording → STT → LLM → TTS → speaker
-- [ ] Interruption par rappui sur le bouton
+- [x] Piper TTS integration
+- [x] Audio output
+- [x] Full audio loop: recording → STT → LLM → TTS → speaker
+- [x] Interruption by re-click
 
-### Phase 4 — UI complète
-- [ ] Icônes et couleurs par état
-- [ ] Spectre audio sur le FAB
-- [ ] Fenêtre de configuration (URL, key, model selector)
-- [ ] System tray + minimisation
-- [ ] Raccourci clavier configurable
+### Phase 4 — Dictation + IPC
+- [x] Dictation mode (silence auto-stop, clipboard, wtype injection)
+- [x] IPC socket + CLI flags (`--dicter`, `--jacasser`, `--reset`)
+- [x] Packaging (pip/pipx installable)
 
-### Phase 5 — Polissage v1
-- [ ] Gestion d'erreurs (réseau, GPU, micro)
-- [ ] Logs
-- [ ] Packaging (AppImage/Flatpak ou bundle simple)
-- [ ] Tests de base
+### Phase 5 — UI complete
+- [x] Icons and colours per state
+- [x] Configuration window
+- [x] System tray + minimisation
+- [ ] Audio spectrum on FAB
 
-### Phase 6+ — Améliorations
-- [ ] Keyword spotting (openWakeWord) + interruption
-- [ ] VAD naturelle pendant l'enregistrement (détection silence → fin auto)
-- [ ] Streaming des transcriptions partielles vers LLM
-- [ ] Streaming des premières tokens TTS avant fin LLM
-- [ ] Support Windows / macOS
-- [ ] Contexte conversationnel (histoire des exchanges)
+### Phase 6 — Polish v1
+- [x] Error handling (network, GPU, mic)
+- [x] Logs
+- [ ] AUR package (and other distro packages)
+- [ ] Tests
 
-## Convention de code
+### Phase 7+ — Improvements
+- [ ] openWakeWord keyword spotting + interruption
+- [ ] Natural VAD during recording (auto-stop on silence)
+- [ ] Streaming partial transcriptions to LLM
+- [ ] Streaming early TTS tokens before LLM finishes
+- [ ] Windows / macOS support
+- [ ] Conversational context (history)
 
-- Type hints partout
-- Classes avec responsabilité unique
-- Async dans la mesure du possible (httpx, process audio)
-- DRY — factoriser sans sur-ingenierie
-- Tests pour chaque module
-- `ruff` pour le formatage, `mypy` pour le typage
-- Docstrings uniquement pour l'API publique (ne pas commenter l'évident)
+## Code Conventions
 
-## Dépendances clés (pyproject.toml)
+- Type hints everywhere
+- Single-responsibility classes
+- Async where possible (httpx, audio processing)
+- DRY — factorise without over-engineering
+- Tests per module
+- `ruff` for formatting, `mypy` for typing
+- Docstrings only for public API (don't comment the obvious)
+
+## Key dependencies (pyproject.toml)
 
 ```toml
 [project]
@@ -215,19 +230,19 @@ dependencies = [
     "faster-whisper>=1.1",
     "piper-tts>=1.2",
     "httpx[sse]>=0.27",
-    "tomli>=2.0",
-    "numpy>=1.26",
+    "qtawesome>=1.4",
+    "pynput>=1.7",
 ]
 
 [project.optional-dependencies]
 keyword = ["openwakeword"]
 ```
 
-## Notes finales
+## Final Notes
 
-- Le LLM est un service externe (llama.cpp server, ou tout serveur OpenAI-compatible).
-- Le STT et TTS sont 100% locaux.
-- L'interface doit pouvoir se faire discrète — FAB petit, transparent, qui passe inaperçu.
-- Rien n'est envoyé au cloud sauf les requêtes LLM (via l'API configurée).
-- La latence est l'ennemi numéro 1 — chaque ms compte.
-- Pas de edge computing, pas de dépendance internet pour la voix.
+- The LLM is an external service (llama.cpp server, or any OpenAI-compatible server).
+- STT and TTS are 100% local.
+- The interface should be discreet — small, semi-transparent FAB that blends in.
+- Nothing is sent to the cloud except LLM requests (via the configured API).
+- Latency is enemy number one — every millisecond counts.
+- No edge computing, no internet dependency for voice.

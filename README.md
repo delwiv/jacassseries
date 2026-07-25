@@ -1,3 +1,5 @@
+> **[🇫🇷 Version française](README.fr.md)**
+
 # jacasseries
 
 Voice interface for LLM — talk to your AI like you'd chat with a friend.
