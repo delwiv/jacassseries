@@ -136,7 +136,7 @@ class FAB(QWidget):
         menu.addSeparator()
         quit_action = menu.addAction("Quitter")
         quit_action.triggered.connect(self.quit_requested.emit)
-        menu.exec(event.globalPosition().toPoint())
+        menu.exec(event.globalPos())
 
     def _toggle_mode(self) -> None:
         new_mode = Mode.DICTATION if self._mode == Mode.CONVERSATION else Mode.CONVERSATION
