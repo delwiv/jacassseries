@@ -84,6 +84,15 @@ No additional configuration needed — `wtype` works out of the box under Waylan
 
 ### Python package
 
+#### pipx (recommandé — Arch Linux, PEP 668-safe)
+
+```bash
+sudo pacman -S python-pipx     # Arch
+pipx install /path/to/jacasseries
+```
+
+#### pip (Debian, Fedora, macOS)
+
 ```bash
 git clone https://github.com/your-username/jacasseries.git
 cd jacasseries
@@ -190,17 +199,17 @@ src/
 
 ## Roadmap
 
-**Current (Phase 1-3):** Core pipeline + dictation mode + IPC/CLI flags for
-Wayland-native keyboard control. Package installable via pip (`jacasseries`
-command in PATH).
-
-**Upcoming:**
-- Hardware detection (CUDA / Vulkan for AMD/Intel)
-- openWakeWord keyword spotting for hands-free interruption
-- Streaming partial transcriptions to LLM
-- Cross-platform support (Windows, macOS)
-- Audio spectrum animation on FAB
-- Conversation context management
+- [x] Core pipeline: record → STT → LLM → TTS → play
+- [x] Dictation mode with silence auto-stop and text injection
+- [x] IPC socket + CLI flags (`--dicter`, `--jacasser`, `--reset`)
+- [x] Package installable via pip/pipx (`jacasseries` command in PATH)
+- [ ] AUR package (and other distro packages)
+- [ ] Hardware detection (CUDA / Vulkan for AMD/Intel)
+- [ ] openWakeWord keyword spotting for hands-free interruption
+- [ ] Streaming partial transcriptions to LLM
+- [ ] Cross-platform support (Windows, macOS)
+- [ ] Audio spectrum animation on FAB
+- [ ] Conversation context management
 
 ## License
 
