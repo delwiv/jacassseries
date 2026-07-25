@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import qtawesome as qta
 from PySide6.QtWidgets import QWidget, QPushButton, QMenu
-from PySide6.QtCore import Qt, QSize, Signal, QPoint, QTimer
-from PySide6.QtGui import QMouseEvent
-
+from PySide6.QtCore import Qt, QSize, Signal, QTimer
 from src.pipeline.orchestrator import Mode, State
 
 
@@ -35,45 +33,6 @@ DICTATION_ICONS = {
 FAB_SIZE = 56
 
 
-class FABButton(QPushButton):
-    _DRAG_THRESHOLD = 5
-
-    def __init__(self, parent: QWidget) -> None:
-        super().__init__(parent)
-        self._press_pos: QPoint | None = None
-        self._dragged = False
-
-    @property
-    def dragged(self) -> bool:
-        return self._dragged
-
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        self._press_pos = event.globalPosition().toPoint()
-        self._dragged = False
-        parent = self.parent()
-        if parent and isinstance(parent, FAB):
-            g = event.globalPosition().toPoint()
-            parent._drag_pos = g - parent.frameGeometry().topLeft()
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if self._press_pos and event.buttons() == Qt.MouseButton.LeftButton:
-            delta = event.globalPosition().toPoint() - self._press_pos
-            if delta.manhattanLength() > self._DRAG_THRESHOLD:
-                self._dragged = True
-            parent = self.parent()
-            if parent and hasattr(parent, "_move_to"):
-                parent._move_to(event.globalPosition().toPoint())
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        self._press_pos = None
-        parent = self.parent()
-        if parent:
-            parent._drag_pos = None
-        super().mouseReleaseEvent(event)
-
-
 class FAB(QWidget):
     clicked = Signal()
     long_pressed = Signal()
@@ -86,7 +45,6 @@ class FAB(QWidget):
         super().__init__()
         self._state = State.IDLE
         self._mode = Mode.CONVERSATION
-        self._drag_pos: QPoint | None = None
         self._long_press_fired = False
         self._long_press_timer = QTimer(self)
         self._long_press_timer.setSingleShot(True)
@@ -104,7 +62,7 @@ class FAB(QWidget):
         self.setFixedSize(FAB_SIZE, FAB_SIZE)
 
     def _setup_ui(self) -> None:
-        self.button = FABButton(self)
+        self.button = QPushButton(self)
         self.button.setFixedSize(FAB_SIZE, FAB_SIZE)
         self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.button.setIconSize(QSize(24, 24))
@@ -156,7 +114,7 @@ class FAB(QWidget):
 
     def _on_button_released(self) -> None:
         self._long_press_timer.stop()
-        if not self._long_press_fired and not self.button.dragged:
+        if not self._long_press_fired:
             self.clicked.emit()
 
     def _on_long_press(self) -> None:
@@ -178,12 +136,8 @@ class FAB(QWidget):
         menu.addSeparator()
         quit_action = menu.addAction("Quitter")
         quit_action.triggered.connect(self.quit_requested.emit)
-        menu.exec(self.mapToGlobal(QPoint(FAB_SIZE // 2, FAB_SIZE)))
+        menu.exec(event.globalPosition().toPoint())
 
     def _toggle_mode(self) -> None:
         new_mode = Mode.DICTATION if self._mode == Mode.CONVERSATION else Mode.CONVERSATION
         self.mode_change_requested.emit(new_mode)
-
-    def _move_to(self, global_pos: QPoint) -> None:
-        if self._drag_pos is not None:
-            self.move(global_pos - self._drag_pos)
