@@ -6,8 +6,8 @@ from typing import Optional
 
 import numpy as np
 
-from src.audio.output import AudioOutput
-from src.tts.synthesizer import Synthesizer
+from ..audio.output import AudioOutput
+from ..tts.synthesizer import Synthesizer
 
 
 class SentenceAccumulator:

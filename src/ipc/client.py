@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import socket
 
-from src.ipc.server import SOCKET_PATH
+from .server import SOCKET_PATH
 
 
 def send_command(cmd: dict) -> bool:

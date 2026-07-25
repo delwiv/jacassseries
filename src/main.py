@@ -17,7 +17,7 @@ FLAG_MAP = {
 
 
 def _setup_cuda() -> None:
-    from src.stt.transcriber import _cublas_lib_path
+    from .stt.transcriber import _cublas_lib_path
     path = _cublas_lib_path()
     if not path:
         return
@@ -47,14 +47,14 @@ def main() -> None:
     cmd = _parse_args()
 
     if cmd:
-        from src.ipc.client import send_command
+        from .ipc.client import send_command
         if send_command(cmd):
             print(f"[ipc] sent command: {cmd}")
             return
 
     _setup_cuda()
 
-    from src.app import JacasseriesApp
+    from .app import JacasseriesApp
 
     app = JacasseriesApp(sys.argv, startup_cmd=cmd)
 

@@ -16,6 +16,9 @@ dependencies = [
     "pynput>=1.7",
 ]
 
+[project.scripts]
+jacasseries = "jacasseries.main:main"
+
 [project.optional-dependencies]
 keyword = ["openwakeword"]
 

@@ -17,10 +17,10 @@ from PySide6.QtWidgets import (
     QLabel,
 )
 
-from src.audio.capture import AudioCapture
-from src.config import Config
-from src.llm.client import LLMClient
-from src.tts.synthesizer import KNOWN_VOICES
+from ..audio.capture import AudioCapture
+from ..config import Config
+from ..llm.client import LLMClient
+from ..tts.synthesizer import KNOWN_VOICES
 
 
 class ConfigWindow(QDialog):

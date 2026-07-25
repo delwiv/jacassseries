@@ -3,7 +3,7 @@ from __future__ import annotations
 import qtawesome as qta
 from PySide6.QtWidgets import QWidget, QPushButton, QMenu
 from PySide6.QtCore import Qt, QSize, Signal, QTimer
-from src.pipeline.orchestrator import Mode, State
+from ..pipeline.orchestrator import Mode, State
 
 
 COLORS = {

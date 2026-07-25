@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QSystemTrayIcon, QMenu
 from PySide6.QtCore import Signal, QSize
 from PySide6.QtGui import QPixmap, QPainter, QColor, QBrush
 
-from src.pipeline.orchestrator import Mode
+from ..pipeline.orchestrator import Mode
 
 
 class SystemTray(QSystemTrayIcon):

@@ -7,21 +7,21 @@ from typing import Optional
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
-from src.audio.capture import AudioCapture, SAMPLE_RATE
-from src.audio.output import AudioOutput
-from src.audio.vad import EnergyVAD
-from src.config import Config
-from src.input.injector import TextInjector
-from src.ipc.server import IPCServer
-from src.llm.client import LLMClient
-from src.pipeline.orchestrator import Mode, Orchestrator, State
-from src.pipeline.streamer import TTSStreamer
-from src.stt.transcriber import Transcriber
-from src.tts.synthesizer import Synthesizer
-from src.keyword.spotter import GlobalShortcut
-from src.ui.config_window import ConfigWindow
-from src.ui.fab import FAB
-from src.ui.tray import SystemTray
+from .audio.capture import AudioCapture, SAMPLE_RATE
+from .audio.output import AudioOutput
+from .audio.vad import EnergyVAD
+from .config import Config
+from .input.injector import TextInjector
+from .ipc.server import IPCServer
+from .llm.client import LLMClient
+from .pipeline.orchestrator import Mode, Orchestrator, State
+from .pipeline.streamer import TTSStreamer
+from .stt.transcriber import Transcriber
+from .tts.synthesizer import Synthesizer
+from .keyword.spotter import GlobalShortcut
+from .ui.config_window import ConfigWindow
+from .ui.fab import FAB
+from .ui.tray import SystemTray
 
 
 class _MainThread(QObject):
