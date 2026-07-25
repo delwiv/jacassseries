@@ -3,7 +3,7 @@ from __future__ import annotations
 import qtawesome as qta
 from PySide6.QtWidgets import QWidget, QPushButton, QMenu
 from PySide6.QtCore import Qt, QSize, Signal, QPoint, QTimer
-from PySide6.QtGui import QMouseEvent, QCursor
+from PySide6.QtGui import QMouseEvent
 
 from src.pipeline.orchestrator import Mode, State
 
@@ -50,6 +50,10 @@ class FABButton(QPushButton):
     def mousePressEvent(self, event: QMouseEvent) -> None:
         self._press_pos = event.globalPosition().toPoint()
         self._dragged = False
+        parent = self.parent()
+        if parent and isinstance(parent, FAB):
+            g = event.globalPosition().toPoint()
+            parent._drag_pos = g - parent.frameGeometry().topLeft()
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
@@ -64,6 +68,9 @@ class FABButton(QPushButton):
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self._press_pos = None
+        parent = self.parent()
+        if parent:
+            parent._drag_pos = None
         super().mouseReleaseEvent(event)
 
 
@@ -171,13 +178,12 @@ class FAB(QWidget):
         menu.addSeparator()
         quit_action = menu.addAction("Quitter")
         quit_action.triggered.connect(self.quit_requested.emit)
-        menu.exec(QCursor.pos())
+        menu.exec(self.mapToGlobal(QPoint(FAB_SIZE // 2, FAB_SIZE)))
 
     def _toggle_mode(self) -> None:
         new_mode = Mode.DICTATION if self._mode == Mode.CONVERSATION else Mode.CONVERSATION
         self.mode_change_requested.emit(new_mode)
 
     def _move_to(self, global_pos: QPoint) -> None:
-        if self._drag_pos is None:
-            self._drag_pos = global_pos - self.frameGeometry().topLeft()
-        self.move(global_pos - self._drag_pos)
+        if self._drag_pos is not None:
+            self.move(global_pos - self._drag_pos)
