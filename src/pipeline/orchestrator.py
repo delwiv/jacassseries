@@ -12,10 +12,17 @@ class State(Enum):
     TTS = auto()
 
 
+class Mode(Enum):
+    CONVERSATION = auto()
+    DICTATION = auto()
+
+
 class Orchestrator:
     def __init__(self) -> None:
         self._state = State.IDLE
+        self._mode = Mode.CONVERSATION
         self._listeners: list[callable] = []
+        self._mode_listeners: list[callable] = []
         self.on_transcription_ready: Optional[callable] = None
         self.on_llm_token: Optional[callable] = None
         self.on_llm_ready: Optional[callable] = None
@@ -24,8 +31,22 @@ class Orchestrator:
     def state(self) -> State:
         return self._state
 
+    @property
+    def mode(self) -> Mode:
+        return self._mode
+
+    def set_mode(self, mode: Mode) -> None:
+        if mode == self._mode:
+            return
+        self._mode = mode
+        for listener in self._mode_listeners:
+            listener(mode)
+
     def on_state_change(self, listener: callable) -> None:
         self._listeners.append(listener)
+
+    def on_mode_change(self, listener: callable) -> None:
+        self._mode_listeners.append(listener)
 
     def _set_state(self, new_state: State) -> None:
         if new_state == self._state:
@@ -48,7 +69,10 @@ class Orchestrator:
     def transcription_done(self, text: str) -> None:
         if self._state != State.TRANSCRIBING:
             return
-        self._set_state(State.LLM)
+        if self._mode == Mode.DICTATION:
+            self._set_state(State.IDLE)
+        else:
+            self._set_state(State.LLM)
         if self.on_transcription_ready:
             self.on_transcription_ready(text)
 
@@ -64,5 +88,5 @@ class Orchestrator:
             self._set_state(State.IDLE)
 
     def interrupt(self) -> None:
-        if self._state in (State.TTS, State.LLM, State.TRANSCRIBING):
+        if self._state != State.IDLE:
             self._set_state(State.IDLE)

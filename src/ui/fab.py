@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QWidget, QPushButton, QMenu
 from PySide6.QtCore import Qt, QSize, Signal, QPoint, QTimer
 from PySide6.QtGui import QColor, QMouseEvent
 
-from src.pipeline.orchestrator import State
+from src.pipeline.orchestrator import Mode, State
 
 
 COLORS = {
@@ -16,8 +16,16 @@ COLORS = {
     State.TTS: "#4CAF50",
 }
 
-ICONS = {
+CONVERSATION_ICONS = {
     State.IDLE: "fa6s.microphone",
+    State.RECORDING: "fa6s.microphone",
+    State.TRANSCRIBING: "fa6s.pen",
+    State.LLM: "fa6s.robot",
+    State.TTS: "fa6s.volume-high",
+}
+
+DICTATION_ICONS = {
+    State.IDLE: "fa6s.keyboard",
     State.RECORDING: "fa6s.microphone",
     State.TRANSCRIBING: "fa6s.pen",
     State.LLM: "fa6s.robot",
@@ -33,10 +41,12 @@ class FAB(QWidget):
     config_requested = Signal()
     reset_requested = Signal()
     quit_requested = Signal()
+    mode_change_requested = Signal(object)
 
     def __init__(self) -> None:
         super().__init__()
         self._state = State.IDLE
+        self._mode = Mode.CONVERSATION
         self._drag_pos: QPoint | None = None
         self._long_press_fired = False
         self._long_press_timer = QTimer(self)
@@ -73,9 +83,20 @@ class FAB(QWidget):
             self._state = new_state
             self._update_button()
 
+    @property
+    def mode(self) -> Mode:
+        return self._mode
+
+    def set_mode(self, mode: Mode) -> None:
+        self._mode = mode
+        self._update_button()
+
+    def _icons(self) -> dict:
+        return DICTATION_ICONS if self._mode == Mode.DICTATION else CONVERSATION_ICONS
+
     def _update_button(self) -> None:
         color = COLORS.get(self._state, COLORS[State.IDLE])
-        icon_name = ICONS.get(self._state, ICONS[State.IDLE])
+        icon_name = self._icons().get(self._state, CONVERSATION_ICONS[State.IDLE])
         icon = qta.icon(icon_name, color="#FFFFFF")
         self.button.setIcon(icon)
         self.button.setStyleSheet(
@@ -108,12 +129,21 @@ class FAB(QWidget):
         reset_action = menu.addAction("Nouvelle discussion")
         reset_action.triggered.connect(self.reset_requested.emit)
         menu.addSeparator()
+        mode_action = menu.addAction("Mode dictée")
+        mode_action.setCheckable(True)
+        mode_action.setChecked(self._mode == Mode.DICTATION)
+        mode_action.triggered.connect(self._toggle_mode)
+        menu.addSeparator()
         config_action = menu.addAction("Configuration")
         config_action.triggered.connect(self.config_requested.emit)
         menu.addSeparator()
         quit_action = menu.addAction("Quitter")
         quit_action.triggered.connect(self.quit_requested.emit)
         menu.exec(event.globalPos())
+
+    def _toggle_mode(self) -> None:
+        new_mode = Mode.DICTATION if self._mode == Mode.CONVERSATION else Mode.CONVERSATION
+        self.mode_change_requested.emit(new_mode)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:

@@ -42,6 +42,7 @@ DEFAULT_CONFIG = {
     },
     "general": {
         "keyboard_shortcut": "",
+        "silence_timeout": 2.0,
     },
 }
 
@@ -58,6 +59,7 @@ class Config:
     tts_voice: str = ""
     microphone: str = ""
     keyboard_shortcut: str = ""
+    silence_timeout: float = 2.0
 
     @classmethod
     def load(cls) -> Config:
@@ -76,6 +78,7 @@ class Config:
         cfg.tts_voice = _resolve_env(data.get("tts", {}).get("voice", cfg.tts_voice))
         cfg.microphone = _resolve_env(data.get("audio", {}).get("microphone", cfg.microphone))
         cfg.keyboard_shortcut = _resolve_env(data.get("general", {}).get("keyboard_shortcut", cfg.keyboard_shortcut))
+        cfg.silence_timeout = float(data.get("general", {}).get("silence_timeout", cfg.silence_timeout))
         return cfg
 
     def save(self) -> None:
@@ -102,5 +105,6 @@ class Config:
             "",
             "[general]",
             f'keyboard_shortcut = "{self.keyboard_shortcut}"',
+            f'silence_timeout = "{self.silence_timeout}"',
         ]
         CONFIG_PATH.write_text("\n".join(lines) + "\n")
